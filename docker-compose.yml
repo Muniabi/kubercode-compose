@@ -19,6 +19,24 @@ services:
             redis:
                 condition: service_started
 
+    kubercode-frontend:
+        container_name: kubercode-frontend
+        networks:
+            - app_network
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        ports:
+            - "3000:3000"
+        environment:
+            - NEXT_PUBLIC_API_URL=http://localhost:8080
+            - NEXTAUTH_URL=http://localhost:3000
+            - NEXTAUTH_SECRET=58aeddb0d583a
+        depends_on:
+            - kubercode-sso
+            - mongodb
+            - redis
+
     # kubercode-student:
     #     container_name: kubercode-student
     #     networks:
