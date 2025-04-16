@@ -1,0 +1,97 @@
+services:
+    kubercode-sso:
+        container_name: kubercode-sso
+        networks:
+            - app_network
+        build:
+            context: ./sso
+            dockerfile: Dockerfile
+        ports:
+            - "1488:1488"
+        environment:
+            - MONGO_URI=mongodb://user:password@mongodb:27017
+            - JWT_SECRET=your-secret-key
+            - REDIS_ADDR=redis:6379
+            - REDIS_PASS=my-password
+        depends_on:
+            mongodb:
+                condition: service_healthy
+            redis:
+                condition: service_started
+
+    # kubercode-student:
+    #     container_name: kubercode-student
+    #     networks:
+    #         - app_network
+    #     build:
+    #         context: ./student-service
+    #         dockerfile: Dockerfile
+    #     ports:
+    #         - "8080:8080"
+    #     environment:
+    #         - MONGO_URI=mongodb://user:password@mongodb:27017
+    #         - REDIS_HOST=redis
+    #         - REDIS_PORT=6379
+    #         - REDIS_PASSWORD=my-password
+    #     depends_on:
+    #         - kubercode-sso
+    #         - mongodb
+    #         - redis
+
+    nginx:
+        container_name: kubercode-nginx
+        image: nginx:latest
+        networks:
+            - app_network
+        ports:
+            - "8080:8080"
+        volumes:
+            - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+        depends_on:
+            - kubercode-sso
+            # - kubercode-student
+
+    mongodb:
+        container_name: kubercode-mongodb
+        networks:
+            - app_network
+        image: mongo:latest
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME=user
+            - MONGO_INITDB_ROOT_PASSWORD=password
+        healthcheck:
+            test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+            interval: 10s
+            timeout: 30s
+            retries: 5
+            start_period: 10s
+        ports:
+            - "27017:27017"
+        volumes:
+            - type: volume
+              source: mongodb-volume-data
+              target: /data/db
+
+    redis:
+        image: redis:latest
+        container_name: kubercode-redis
+        restart: always
+        networks:
+            - app_network
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis:/data
+        environment:
+            - REDIS_PASSWORD=my-password
+            - REDIS_PORT=6379
+            - REDIS_DATABASES=16
+        command: redis-server --requirepass my-password
+
+volumes:
+    mongodb-volume-data:
+    redis:
+
+networks:
+    app_network:
+        driver: bridge
